@@ -1,0 +1,1456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Northfield University · Student Portal Course Registration Prototype</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-canvas: #F6F9F8;
+      --bg-surface: #FFFFFF;
+      --bg-dark: #0B2421;
+      --bg-dark-card: #08201D;
+      --brand-primary: #0A5C48;
+      --brand-primary-hover: #064E3B;
+      --mint-tint: #E6F3EE;
+      --mint-border: #C7E3D9;
+      --mint-text: #0A5C48;
+      --amber-tint: #FDF3E2;
+      --amber-border: #F5DEB3;
+      --amber-text: #9A5B13;
+      --ink-primary: #102A26;
+      --ink-secondary: #526662;
+      --ink-muted: #7A8E8A;
+      --line-subtle: #E2ECE8;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: var(--bg-canvas);
+      color: var(--ink-primary);
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Custom checkbox styling aligned with Northfield forest teal design */
+    .nf-checkbox {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      min-width: 18px;
+      border: 1.5px solid #9BB0AA;
+      border-radius: 4px;
+      background-color: #FFFFFF;
+      display: inline-grid;
+      place-content: center;
+      cursor: pointer;
+      transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+    }
+
+    .nf-checkbox:hover {
+      border-color: var(--brand-primary);
+    }
+
+    .nf-checkbox:checked {
+      background-color: var(--brand-primary);
+      border-color: var(--brand-primary);
+    }
+
+    .nf-checkbox:checked::before {
+      content: "";
+      width: 10px;
+      height: 10px;
+      clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+      background-color: #FFFFFF;
+    }
+
+    .modal-backdrop {
+      background-color: rgba(110, 117, 115, 0.72);
+      backdrop-filter: blur(1px);
+    }
+
+    @keyframes modalPop {
+      from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.985);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .modal-card {
+      animation: modalPop 0.18s ease-out forwards;
+    }
+
+    /* Weekly schedule grid rows */
+    .schedule-hour-row {
+      height: 54px;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+  <!-- Application Root Container -->
+  <div id="app" class="flex-1 flex flex-col"></div>
+
+  <!-- Discreet Usability Tester Helper Bar -->
+  <div id="tester-bar" class="fixed bottom-3 right-3 z-40 flex flex-wrap items-center gap-1.5 rounded-xl bg-[#0B2421]/95 text-white px-3 py-2 shadow-lg border border-white/10 text-xs">
+    <span class="font-medium text-emerald-200/90 pr-1">Prototype</span>
+    <button type="button" onclick="switchView('sidebar-dashboard')" class="px-2 py-1 rounded-lg hover:bg-white/10 transition">Sidebar Dash</button>
+    <button type="button" onclick="switchView('course-dashboard')" class="px-2 py-1 rounded-lg hover:bg-white/10 transition">Course-First Dash</button>
+    <button type="button" onclick="switchView('registration-landing')" class="px-2 py-1 rounded-lg hover:bg-white/10 transition">Reg Landing</button>
+    <button type="button" onclick="switchView('registration-workspace')" class="px-2 py-1 rounded-lg hover:bg-white/10 transition">Workspace</button>
+    <button type="button" onclick="resetPrototypeState()" class="ml-1 px-2 py-1 rounded-lg bg-[#0A5C48] hover:bg-[#064E3B] font-medium transition">Reset</button>
+  </div>
+
+  <script>
+    /**
+     * NORTHFIELD UNIVERSITY STUDENT PORTAL COURSE REGISTRATION PROTOTYPE
+     * ----------------------------------------------------------------
+     * Faithfully replicates the interactive flows from the Figma screens:
+     * - 01 · Sidebar dashboard
+     * - 03 · Course-first dashboard
+     * - Course registration (Landing)
+     * - Register for courses · Empty schedule & Imported plan
+     * - Existing Spring plan · Pop-up
+     * - Course selection required
+     * - Courses saved · Confirmation
+     * - Alternatives · Choose courses
+     */
+
+    // Course catalog definition (initial 3 shown by default, 3 additional under "More courses")
+    const CATALOG_COURSES = [
+      {
+        id: 'CS-220',
+        code: 'CS 220',
+        title: 'Object-Oriented Programming',
+        credits: 3,
+        scheduleText: 'Mon / Wed · 10:00–11:15 AM',
+        location: 'Science Hall 204 · Section 01',
+        seatsAvailable: 12,
+        waitlistSeats: 8,
+        isFull: false,
+        defaultCheckedWhenImported: true,
+        scheduleBlocks: [
+          { day: 'MON', startHour: 10.0, durationHours: 1.25, labelTime: '10–11:15', variant: 'mint' },
+          { day: 'WED', startHour: 10.0, durationHours: 1.25, labelTime: '10–11:15', variant: 'mint' }
+        ],
+        group: 'first'
+      },
+      {
+        id: 'MATH-230',
+        code: 'MATH 230',
+        title: 'Discrete Mathematics',
+        credits: 3,
+        scheduleText: 'Tue / Thu · 1:00–2:15 PM',
+        location: 'Carter Hall 112 · Section 02',
+        seatsAvailable: 0,
+        waitlistSeats: 6,
+        isFull: true,
+        defaultCheckedWhenImported: true,
+        scheduleBlocks: [], // Full courses join waitlist and do not reserve a time slot
+        group: 'first'
+      },
+      {
+        id: 'HIST-110',
+        code: 'HIST 110',
+        title: 'World History',
+        credits: 3,
+        scheduleText: 'Mon / Wed · 2:30–3:45 PM',
+        location: 'Liberal Arts 108 · Section 01',
+        seatsAvailable: 18,
+        waitlistSeats: 10,
+        isFull: false,
+        defaultCheckedWhenImported: true,
+        scheduleBlocks: [
+          { day: 'MON', startHour: 14.5, durationHours: 1.25, labelTime: '2:30–3:45', variant: 'amber' },
+          { day: 'WED', startHour: 14.5, durationHours: 1.25, labelTime: '2:30–3:45', variant: 'amber' }
+        ],
+        group: 'first'
+      },
+      {
+        id: 'PHIL-120',
+        code: 'PHIL 120',
+        title: 'Introduction to Logic',
+        credits: 3,
+        scheduleText: 'Tue / Thu · 9:00–10:15 AM',
+        location: 'Humanities 210 · Section 01',
+        seatsAvailable: 14,
+        waitlistSeats: 8,
+        isFull: false,
+        defaultCheckedWhenImported: false,
+        scheduleBlocks: [
+          { day: 'TUE', startHour: 9.0, durationHours: 1.25, labelTime: '9–10:15', variant: 'mint' },
+          { day: 'THU', startHour: 9.0, durationHours: 1.25, labelTime: '9–10:15', variant: 'mint' }
+        ],
+        group: 'more'
+      },
+      {
+        id: 'STAT-200',
+        code: 'STAT 200',
+        title: 'Applied Statistics',
+        credits: 3,
+        scheduleText: 'Tue / Thu · 11:30 AM–12:45 PM',
+        location: 'Science Hall 105 · Section 03',
+        seatsAvailable: 9,
+        waitlistSeats: 5,
+        isFull: false,
+        defaultCheckedWhenImported: false,
+        scheduleBlocks: [
+          { day: 'TUE', startHour: 11.5, durationHours: 1.25, labelTime: '11:30–12:45', variant: 'mint' },
+          { day: 'THU', startHour: 11.5, durationHours: 1.25, labelTime: '11:30–12:45', variant: 'mint' }
+        ],
+        group: 'more'
+      },
+      {
+        id: 'SOC-150',
+        code: 'SOC 150',
+        title: 'Society and Culture',
+        credits: 3,
+        scheduleText: 'Fri · 10:00 AM–12:30 PM',
+        location: 'Liberal Arts 302 · Section 01',
+        seatsAvailable: 21,
+        waitlistSeats: 10,
+        isFull: false,
+        defaultCheckedWhenImported: false,
+        scheduleBlocks: [
+          { day: 'FRI', startHour: 10.0, durationHours: 2.5, labelTime: '10–12:30', variant: 'mint' }
+        ],
+        group: 'more'
+      }
+    ];
+
+    // No-time-conflict alternative courses shown in the "Explore courses that fit" modal
+    const ALTERNATIVE_COURSES = [
+      {
+        id: 'PHIL-120',
+        code: 'PHIL 120',
+        title: 'Introduction to Logic',
+        scheduleCredits: 'Tue / Thu · 9:00–10:15 AM · 3 credits',
+        seatsText: '14 seats available · 8 waitlist seats available'
+      },
+      {
+        id: 'STAT-200',
+        code: 'STAT 200',
+        title: 'Applied Statistics',
+        scheduleCredits: 'Tue / Thu · 11:30 AM–12:45 PM · 3 credits',
+        seatsText: '9 seats available · 5 waitlist seats available'
+      },
+      {
+        id: 'SOC-150',
+        code: 'SOC 150',
+        title: 'Society and Culture',
+        scheduleCredits: 'Fri · 10:00 AM–12:30 PM · 3 credits',
+        seatsText: '21 seats available · 10 waitlist seats available'
+      }
+    ];
+
+    // Central prototype state
+    const state = {
+      currentView: 'sidebar-dashboard', // 'sidebar-dashboard' | 'course-dashboard' | 'registration-landing' | 'registration-workspace'
+      searchQuery: '',
+      showAllCourses: false,
+      planImported: false,
+      hasExistingPlan: true,
+      // Map of courseId -> { checked: boolean, statusTag: 'imported' | 'selected' | 'saved' }
+      yourCourses: {},
+      savedScheduleCourseIds: [],
+      activeModal: null, // null | 'existing-plan' | 'selection-required' | 'courses-saved' | 'alternatives'
+      selectedAlternativeIds: []
+    };
+
+    function getCourseById(id) {
+      return CATALOG_COURSES.find(c => c.id === id);
+    }
+
+    function switchView(viewName) {
+      state.currentView = viewName;
+      state.activeModal = null;
+      render();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function resetPrototypeState() {
+      state.currentView = 'sidebar-dashboard';
+      state.searchQuery = '';
+      state.showAllCourses = false;
+      state.planImported = false;
+      state.hasExistingPlan = true;
+      state.yourCourses = {};
+      state.savedScheduleCourseIds = [];
+      state.activeModal = null;
+      state.selectedAlternativeIds = [];
+      render();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Navigation handler for "Register for courses" links/buttons
+    function goToRegistrationFlow() {
+      switchView('registration-landing');
+    }
+
+    // Navigation handler for "Plan courses" on Registration Landing
+    function handlePlanCoursesClick() {
+      if (state.hasExistingPlan) {
+        state.activeModal = 'existing-plan';
+        render();
+      } else {
+        switchView('registration-workspace');
+      }
+    }
+
+    function handleExistingPlanContinue() {
+      state.activeModal = null;
+      state.planImported = true;
+      const importedMap = {};
+      ['CS-220', 'MATH-230', 'HIST-110'].forEach(id => {
+        importedMap[id] = { checked: true, statusTag: 'imported' };
+      });
+      state.yourCourses = importedMap;
+      switchView('registration-workspace');
+    }
+
+    function handleCreateNewPlan() {
+      state.activeModal = null;
+      state.planImported = false;
+      state.yourCourses = {};
+      state.savedScheduleCourseIds = [];
+      switchView('registration-workspace');
+    }
+
+    // Import saved Spring 2027 plan (3 courses · 9 credits)
+    function handleImportCoursePlan() {
+      state.planImported = true;
+      const nextMap = { ...state.yourCourses };
+      ['CS-220', 'MATH-230', 'HIST-110'].forEach(id => {
+        nextMap[id] = {
+          checked: true,
+          statusTag: 'imported'
+        };
+      });
+      state.yourCourses = nextMap;
+      render();
+    }
+
+    // Toggle a course from "Available courses" or "Your courses"
+    function toggleCourseSelection(courseId) {
+      const existing = state.yourCourses[courseId];
+      if (!existing) {
+        state.yourCourses[courseId] = {
+          checked: true,
+          statusTag: 'selected'
+        };
+      } else {
+        state.yourCourses[courseId] = {
+          ...existing,
+          checked: !existing.checked
+        };
+      }
+      render();
+    }
+
+    function handleSearchChange(val) {
+      state.searchQuery = val;
+      render();
+      // Preserve focus & cursor position after re-render
+      const input = document.getElementById('course-search-input');
+      if (input) {
+        input.focus();
+        const len = input.value.length;
+        input.setSelectionRange(len, len);
+      }
+    }
+
+    function toggleShowAllCourses(showMore) {
+      state.showAllCourses = showMore;
+      render();
+    }
+
+    function getCheckedCourseIds() {
+      return Object.entries(state.yourCourses)
+        .filter(([, meta]) => meta && meta.checked)
+        .map(([id]) => id);
+    }
+
+    // Bottom action bar: "Remove"
+    function handleRemoveCheckedCourses() {
+      const checkedIds = getCheckedCourseIds();
+      if (checkedIds.length === 0) {
+        state.activeModal = 'selection-required';
+        render();
+        return;
+      }
+      checkedIds.forEach(id => {
+        delete state.yourCourses[id];
+        state.savedScheduleCourseIds = state.savedScheduleCourseIds.filter(savedId => savedId !== id);
+      });
+      render();
+    }
+
+    // Bottom action bar: "Add courses to schedule"
+    function handleAddCoursesToSchedule() {
+      const checkedIds = getCheckedCourseIds();
+      if (checkedIds.length === 0) {
+        state.activeModal = 'selection-required';
+        render();
+        return;
+      }
+
+      // Mark checked courses as saved in schedule
+      checkedIds.forEach(id => {
+        if (!state.savedScheduleCourseIds.includes(id)) {
+          state.savedScheduleCourseIds.push(id);
+        }
+        state.yourCourses[id] = {
+          checked: true,
+          statusTag: 'saved'
+        };
+      });
+
+      // If MATH 230 (0 seats / waitlist course) is among checked/saved courses, show Alternatives modal
+      const includesWaitlistCourse = checkedIds.includes('MATH-230');
+      if (includesWaitlistCourse) {
+        state.selectedAlternativeIds = [];
+        state.activeModal = 'alternatives';
+      } else {
+        state.activeModal = 'courses-saved';
+      }
+      render();
+    }
+
+    function toggleAlternativeCheckbox(altId) {
+      if (state.selectedAlternativeIds.includes(altId)) {
+        state.selectedAlternativeIds = state.selectedAlternativeIds.filter(id => id !== altId);
+      } else {
+        state.selectedAlternativeIds.push(altId);
+      }
+      render();
+    }
+
+    function handleAddAlternativesToList() {
+      state.selectedAlternativeIds.forEach(altId => {
+        state.yourCourses[altId] = {
+          checked: false, // Prompt/modal instructs: "Back on registration, tick the course in Your courses and click Add courses to schedule to save it."
+          statusTag: 'selected'
+        };
+      });
+      state.activeModal = null;
+      state.selectedAlternativeIds = [];
+      render();
+    }
+
+    function closeModal() {
+      state.activeModal = null;
+      render();
+    }
+
+    // Shared Top Header Bar ("NORTHFIELD / STUDENT PORTAL" | "Academic year 2026–27")
+    function renderTopBar(extraRightHtml = '') {
+      return `
+        <header class="w-full bg-white border-b border-[#E2ECE8]">
+          <div class="max-w-[1360px] mx-auto px-4 sm:px-8 h-14 flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <span class="text-[12px] sm:text-[13px] font-bold tracking-[0.06em] uppercase text-[#0B2421]">
+                NORTHFIELD <span class="text-[#7A8E8A] font-medium mx-1">/</span> STUDENT PORTAL
+              </span>
+            </div>
+            <div class="flex items-center gap-3">
+              ${extraRightHtml}
+              <span class="text-xs sm:text-[13px] text-[#526662] tabular-nums">Academic year 2026–27</span>
+            </div>
+          </div>
+        </header>
+      `;
+    }
+
+    // Shared Footer ("Northfield University · Student services" | "Fall 2026")
+    function renderPortalFooter() {
+      return `
+        <footer class="w-full mt-auto pt-10 pb-8">
+          <div class="max-w-[1280px] mx-auto px-4 sm:px-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-[#7A8E8A]">
+            <span>Northfield University · Student services</span>
+            <span>Fall 2026</span>
+          </div>
+        </footer>
+      `;
+    }
+
+    // Registration Open Banner
+    function renderRegistrationBanner(dateText = 'NOV 20 — DEC 11') {
+      return `
+        <div class="w-full rounded-xl bg-[#E6F3EE] border border-[#CBE5DC] px-4 sm:px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <p class="text-sm font-semibold text-[#0A5C48]">Spring registration is open</p>
+            <p class="text-xs sm:text-[13px] text-[#265D4E] mt-0.5">Choose your courses by December 11 to build your next semester.</p>
+          </div>
+          <span class="text-[11px] sm:text-xs font-semibold tracking-[0.05em] uppercase text-[#0A5C48] tabular-nums whitespace-nowrap">
+            ${dateText}
+          </span>
+        </div>
+      `;
+    }
+
+    // Screen A: Sidebar Dashboard ("01 · Sidebar dashboard.png")
+    function renderSidebarDashboard() {
+      const layoutToggle = `
+        <button
+          type="button"
+          onclick="switchView('course-dashboard')"
+          class="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-[#F6F9F8] hover:bg-[#E6F3EE] text-[#0A5C48] border border-[#D4E6DF] transition cursor-pointer"
+          title="Switch to Course-first Dashboard layout"
+        >
+          Switch to Top-Tab View
+        </button>
+      `;
+
+      return `
+        ${renderTopBar(layoutToggle)}
+        <div class="flex-1 flex flex-col lg:flex-row">
+          <!-- Dark Left Sidebar -->
+          <aside class="w-full lg:w-[230px] lg:min-w-[230px] bg-[#0B2421] text-white flex flex-col justify-between py-6 px-3.5">
+            <div>
+              <p class="px-3 text-[11px] font-medium tracking-[0.04em] text-[#8AA39E] mb-3">Quick Links</p>
+              <nav class="space-y-1" aria-label="Quick Links">
+                <button
+                  type="button"
+                  onclick="switchView('sidebar-dashboard')"
+                  class="w-full text-left px-3 py-2.5 rounded-lg bg-[#163632] text-white text-sm font-medium flex items-center justify-between cursor-pointer"
+                >
+                  <span>Dashboard</span>
+                </button>
+                <div class="px-3 py-2.5 rounded-lg text-sm text-[#B8CCC7] select-none cursor-default">Student profile</div>
+                <div class="px-3 py-2.5 rounded-lg text-sm text-[#B8CCC7] select-none cursor-default">Transcript</div>
+                <div class="px-3 py-2.5 rounded-lg text-sm text-[#B8CCC7] select-none cursor-default">Financial aid</div>
+                <div class="px-3 py-2.5 rounded-lg text-sm text-[#B8CCC7] select-none cursor-default">Resources</div>
+              </nav>
+            </div>
+          </aside>
+
+          <!-- Main Content Area -->
+          <main class="flex-1 bg-[#F6F9F8] flex flex-col">
+            <div class="max-w-[1140px] w-full mx-auto px-4 sm:px-8 pt-7 space-y-5">
+              <!-- Welcome Header + Upcoming Term Pill -->
+              <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                <div>
+                  <p class="text-[11px] font-semibold tracking-[0.08em] uppercase text-[#0A5C48]">STUDENT HOME</p>
+                  <h1 class="text-2xl sm:text-[32px] font-bold tracking-[-0.02em] text-[#102A26] mt-1 leading-tight">
+                    Welcome back,Alex.
+                  </h1>
+                  <p class="text-sm text-[#526662] mt-1">Your next semester starts here. Let's get you ready.</p>
+                </div>
+                <div class="bg-white border border-[#E2ECE8] rounded-xl px-4 py-2.5 self-start shadow-[0_1px_2px_rgba(16,42,38,0.03)]">
+                  <p class="text-[10px] font-semibold tracking-[0.06em] uppercase text-[#7A8E8A]">UPCOMING TERM</p>
+                  <p class="text-sm font-bold text-[#102A26] mt-0.5">Spring 2027</p>
+                </div>
+              </div>
+
+              ${renderRegistrationBanner('NOV 20 — DEC 11')}
+
+              <!-- Two-Column Dashboard Grid -->
+              <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                <!-- Left Column (7 cols): To-do list + Current courses -->
+                <div class="lg:col-span-7 space-y-5">
+                  <!-- To-do list card -->
+                  <section class="bg-white border border-[#E2ECE8] rounded-2xl p-5 sm:p-6 shadow-[0_1px_2px_rgba(16,42,38,0.03)]">
+                    <div class="flex items-center justify-between mb-4">
+                      <h2 class="text-base font-bold text-[#102A26]">To-do list</h2>
+                      <span class="text-[11px] font-semibold tracking-[0.05em] uppercase text-[#7A8E8A] tabular-nums">3 ITEMS</span>
+                    </div>
+
+                    <div class="space-y-3">
+                      <div class="rounded-xl bg-[#F8FBFA] border border-[#E9F0ED] p-4 flex items-start justify-between gap-3">
+                        <div>
+                          <p class="text-[11px] font-semibold text-[#7A8E8A] tabular-nums">01</p>
+                          <p class="text-sm font-semibold text-[#102A26] mt-1">Pay outstanding amount</p>
+                          <p class="text-xs text-[#687C78] mt-1">$240.00 due · December 1</p>
+                        </div>
+                        <span class="text-[10px] font-semibold tracking-[0.06em] uppercase text-[#7A8E8A]">ACCOUNT</span>
+                      </div>
+
+                      <div class="rounded-xl bg-[#F8FBFA] border border-[#E9F0ED] p-4 flex items-start justify-between gap-3">
+                        <div>
+                          <p class="text-[11px] font-semibold text-[#7A8E8A] tabular-nums">02</p>
+                          <p class="text-sm font-semibold text-[#102A26] mt-1">View account</p>
+                          <p class="text-xs text-[#687C78] mt-1">Review your student account</p>
+                        </div>
+                        <span class="text-[10px] font-semibold tracking-[0.06em] uppercase text-[#7A8E8A]">ACCOUNT</span>
+                      </div>
+
+                      <div class="rounded-xl bg-[#EAF5F0] border border-[#C8E4DA] p-4 flex items-start justify-between gap-3">
+                        <div>
+                          <p class="text-[11px] font-semibold text-[#0A5C48] tabular-nums">03</p>
+                          <button
+                            type="button"
+                            onclick="goToRegistrationFlow()"
+                            class="text-sm font-semibold text-[#0A5C48] underline underline-offset-4 hover:text-[#064E3B] mt-1 inline-block text-left cursor-pointer"
+                          >
+                            Register for courses
+                          </button>
+                          <p class="text-xs text-[#436C60] mt-1">Spring 2027 · Open until December 11</p>
+                        </div>
+                        <span class="text-[10px] font-semibold tracking-[0.06em] uppercase text-[#0A5C48]">REGISTRATION</span>
+                      </div>
+                    </div>
+                  </section>
+
+                  <!-- Current courses card -->
+                  <section class="bg-white border border-[#E2ECE8] rounded-2xl p-5 sm:p-6 shadow-[0_1px_2px_rgba(16,42,38,0.03)]">
+                    <div class="flex items-center justify-between mb-3">
+                      <h2 class="text-base font-bold text-[#102A26]">Current courses</h2>
+                      <span class="text-[11px] font-semibold tracking-[0.05em] uppercase text-[#7A8E8A]">FALL 2026</span>
+                    </div>
+                    <div class="flex items-center justify-between text-xs text-[#526662] pb-3 border-b border-[#EEF3F1]">
+                      <span class="font-semibold text-[#102A26]">3 courses</span>
+                      <span class="tabular-nums">9 credits</span>
+                    </div>
+
+                    <div class="divide-y divide-[#EEF3F1]">
+                      <div class="py-3.5">
+                        <p class="text-sm font-semibold text-[#102A26]">CS 201 · Data Structures</p>
+                        <p class="text-xs text-[#687C78] mt-0.5">Mon / Wed · 10:00–11:15 AM</p>
+                      </div>
+                      <div class="py-3.5">
+                        <p class="text-sm font-semibold text-[#102A26]">MATH 210 · Linear Algebra</p>
+                        <p class="text-xs text-[#687C78] mt-0.5">Tue / Thu · 1:00–2:15 PM</p>
+                      </div>
+                      <div class="pt-3.5 pb-1">
+                        <p class="text-sm font-semibold text-[#102A26]">ENG 102 · Academic Writing</p>
+                        <p class="text-xs text-[#687C78] mt-0.5">Mon / Wed · 2:00–3:15 PM</p>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+
+                <!-- Right Column (5 cols): Student profile + Financial aid -->
+                <div class="lg:col-span-5 space-y-5">
+                  <section class="bg-white border border-[#E2ECE8] rounded-2xl p-5 sm:p-6 shadow-[0_1px_2px_rgba(16,42,38,0.03)]">
+                    <h2 class="text-base font-bold text-[#102A26] mb-3">Student profile</h2>
+                    <p class="text-lg font-bold text-[#102A26]">Alex Smith</p>
+                    <p class="text-xs text-[#7A8E8A] mt-0.5 tabular-nums">ID 00218476</p>
+                    <p class="text-sm font-medium text-[#102A26] mt-3 leading-snug">
+                      BSE Human Centered Design and Engineering
+                    </p>
+                    <p class="text-xs text-[#687C78] mt-1">Sophomore · Main campus</p>
+                  </section>
+
+                  <section class="bg-white border border-[#E2ECE8] rounded-2xl p-5 sm:p-6 shadow-[0_1px_2px_rgba(16,42,38,0.03)]">
+                    <h2 class="text-base font-bold text-[#102A26] mb-2">Financial aid</h2>
+                    <p class="text-3xl font-bold text-[#102A26] tracking-tight tabular-nums">$4,500</p>
+                    <p class="text-xs font-semibold text-[#102A26] mt-3">Awarded for Spring 2027</p>
+                    <p class="text-xs text-[#687C78] mt-0.5">All required documents received.</p>
+                    <div class="mt-4">
+                      <span class="inline-flex items-center px-3 py-1 rounded-md text-xs font-semibold bg-[#E6F3EE] text-[#0A5C48]">
+                        Award confirmed
+                      </span>
+                    </div>
+                  </section>
+                </div>
+              </div>
+            </div>
+
+            ${renderPortalFooter()}
+          </main>
+        </div>
+      `;
+    }
+
+    // Screen B: Course-first Dashboard ("03 · Course-first dashboard.png")
+    function renderCourseFirstDashboard() {
+      const layoutToggle = `
+        <button
+          type="button"
+          onclick="switchView('sidebar-dashboard')"
+          class="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-[#F6F9F8] hover:bg-[#E6F3EE] text-[#0A5C48] border border-[#D4E6DF] transition cursor-pointer"
+          title="Switch to Sidebar Dashboard layout"
+        >
+          Switch to Sidebar View
+        </button>
+      `;
+
+      return `
+        ${renderTopBar(layoutToggle)}
+        <!-- Horizontal Sub-Navigation Bar -->
+        <div class="w-full bg-white border-b border-[#E2ECE8]">
+          <div class="max-w-[1280px] mx-auto px-4 sm:px-8 py-2.5 flex items-center gap-2 sm:gap-6 overflow-x-auto">
+            <button
+              type="button"
+              onclick="switchView('course-dashboard')"
+              class="px-3.5 py-1.5 rounded-lg bg-[#E6F3EE] text-[#0A5C48] text-xs sm:text-sm font-semibold whitespace-nowrap cursor-pointer"
+            >
+              Dashboard
+            </button>
+            <span class="px-2 py-1.5 text-xs sm:text-sm text-[#526662] whitespace-nowrap select-none cursor-default">Student profile</span>
+            <span class="px-2 py-1.5 text-xs sm:text-sm text-[#526662] whitespace-nowrap select-none cursor-default">To-do list</span>
+            <span class="px-2 py-1.5 text-xs sm:text-sm text-[#526662] whitespace-nowrap select-none cursor-default">Financial aid</span>
+            <span class="px-2 py-1.5 text-xs sm:text-sm text-[#526662] whitespace-nowrap select-none cursor-default">Current courses</span>
+          </div>
+        </div>
+
+        <main class="flex-1 bg-[#F6F9F8] flex flex-col">
+          <div class="max-w-[1280px] w-full mx-auto px-4 sm:px-8 pt-7 space-y-5">
+            <!-- Header Row -->
+            <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+              <div>
+                <p class="text-[11px] font-semibold tracking-[0.08em] uppercase text-[#0A5C48]">STUDENT HOME</p>
+                <h1 class="text-2xl sm:text-[32px] font-bold tracking-[-0.02em] text-[#102A26] mt-1 leading-tight">
+                  Welcome back, Alex
+                </h1>
+                <p class="text-sm text-[#526662] mt-1">Your next semester starts here. Let's get you ready.</p>
+              </div>
+              <div class="bg-white border border-[#E2ECE8] rounded-xl px-4 py-2.5 self-start shadow-[0_1px_2px_rgba(16,42,38,0.03)]">
+                <p class="text-[10px] font-semibold tracking-[0.06em] uppercase text-[#7A8E8A]">UPCOMING TERM</p>
+                <p class="text-sm font-bold text-[#102A26] mt-0.5">Spring 2027</p>
+              </div>
+            </div>
+
+            ${renderRegistrationBanner('NOV 20 — DEC 11')}
+
+            <!-- 2-Column Layout -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+              <!-- Left Column (7 cols): Profile + Financial Aid row above Current Courses -->
+              <div class="lg:col-span-7 space-y-5">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <section class="bg-white border border-[#E2ECE8] rounded-2xl p-5 sm:p-6 shadow-[0_1px_2px_rgba(16,42,38,0.03)]">
+                    <h2 class="text-base font-bold text-[#102A26] mb-3">Student profile</h2>
+                    <p class="text-lg font-bold text-[#102A26]">Alex Smith</p>
+                    <p class="text-xs text-[#7A8E8A] mt-0.5 tabular-nums">ID 00218476</p>
+                    <p class="text-sm font-medium text-[#102A26] mt-3 leading-snug">
+                      BSE Human Centered Design and Engineering
+                    </p>
+                    <p class="text-xs text-[#687C78] mt-1">Sophomore · Main campus</p>
+                  </section>
+
+                  <section class="bg-white border border-[#E2ECE8] rounded-2xl p-5 sm:p-6 shadow-[0_1px_2px_rgba(16,42,38,0.03)]">
+                    <h2 class="text-base font-bold text-[#102A26] mb-2">Financial aid</h2>
+                    <p class="text-3xl font-bold text-[#102A26] tracking-tight tabular-nums">$4,500</p>
+                    <p class="text-xs font-semibold text-[#102A26] mt-3">Awarded for Spring 2027</p>
+                    <p class="text-xs text-[#687C78] mt-0.5">All required documents received.</p>
+                    <div class="mt-4">
+                      <span class="inline-flex items-center px-3 py-1 rounded-md text-xs font-semibold bg-[#E6F3EE] text-[#0A5C48]">
+                        Award confirmed
+                      </span>
+                    </div>
+                  </section>
+                </div>
+
+                <section class="bg-white border border-[#E2ECE8] rounded-2xl p-5 sm:p-6 shadow-[0_1px_2px_rgba(16,42,38,0.03)]">
+                  <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-base font-bold text-[#102A26]">Current courses</h2>
+                    <span class="text-[11px] font-semibold tracking-[0.05em] uppercase text-[#7A8E8A]">FALL 2026</span>
+                  </div>
+                  <div class="flex items-center justify-between text-xs text-[#526662] pb-3 border-b border-[#EEF3F1]">
+                    <span class="font-semibold text-[#102A26]">3 courses</span>
+                    <span class="tabular-nums">9 credits</span>
+                  </div>
+
+                  <div class="divide-y divide-[#EEF3F1]">
+                    <div class="py-3.5">
+                      <p class="text-sm font-semibold text-[#102A26]">CS 201 · Data Structures</p>
+                      <p class="text-xs text-[#687C78] mt-0.5">Mon / Wed · 10:00–11:15 AM</p>
+                    </div>
+                    <div class="py-3.5">
+                      <p class="text-sm font-semibold text-[#102A26]">MATH 210 · Linear Algebra</p>
+                      <p class="text-xs text-[#687C78] mt-0.5">Tue / Thu · 1:00–2:15 PM</p>
+                    </div>
+                    <div class="pt-3.5 pb-1">
+                      <p class="text-sm font-semibold text-[#102A26]">ENG 102 · Academic Writing</p>
+                      <p class="text-xs text-[#687C78] mt-0.5">Mon / Wed · 2:00–3:15 PM</p>
+                    </div>
+                  </div>
+                </section>
+              </div>
+
+              <!-- Right Column (5 cols): To-do list (Items 01–04) -->
+              <div class="lg:col-span-5">
+                <section class="bg-white border border-[#E2ECE8] rounded-2xl p-5 sm:p-6 shadow-[0_1px_2px_rgba(16,42,38,0.03)]">
+                  <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-base font-bold text-[#102A26]">To-do list</h2>
+                    <span class="text-[11px] font-semibold tracking-[0.05em] uppercase text-[#7A8E8A] tabular-nums">3 ITEMS</span>
+                  </div>
+
+                  <div class="space-y-3">
+                    <div class="rounded-xl bg-[#F8FBFA] border border-[#E9F0ED] p-4 flex items-start justify-between gap-3">
+                      <div>
+                        <p class="text-[11px] font-semibold text-[#7A8E8A] tabular-nums">01</p>
+                        <p class="text-sm font-semibold text-[#102A26] mt-1">Pay outstanding amount</p>
+                        <p class="text-xs text-[#687C78] mt-1">$240.00 due · December 1</p>
+                      </div>
+                      <span class="text-[10px] font-semibold tracking-[0.06em] uppercase text-[#7A8E8A]">ACCOUNT</span>
+                    </div>
+
+                    <div class="rounded-xl bg-[#F8FBFA] border border-[#E9F0ED] p-4 flex items-start justify-between gap-3">
+                      <div>
+                        <p class="text-[11px] font-semibold text-[#7A8E8A] tabular-nums">02</p>
+                        <p class="text-sm font-semibold text-[#102A26] mt-1">View account</p>
+                        <p class="text-xs text-[#687C78] mt-1">Review your student account</p>
+                      </div>
+                      <span class="text-[10px] font-semibold tracking-[0.06em] uppercase text-[#7A8E8A]">ACCOUNT</span>
+                    </div>
+
+                    <div class="rounded-xl bg-[#EAF5F0] border border-[#C8E4DA] p-4 flex items-start justify-between gap-3">
+                      <div>
+                        <p class="text-[11px] font-semibold text-[#0A5C48] tabular-nums">03</p>
+                        <button
+                          type="button"
+                          onclick="goToRegistrationFlow()"
+                          class="text-sm font-semibold text-[#0A5C48] underline underline-offset-4 hover:text-[#064E3B] mt-1 inline-block text-left cursor-pointer"
+                        >
+                          Register for courses
+                        </button>
+                        <p class="text-xs text-[#436C60] mt-1">Spring 2027 · Open until December 11</p>
+                      </div>
+                      <span class="text-[10px] font-semibold tracking-[0.06em] uppercase text-[#0A5C48]">REGISTRATION</span>
+                    </div>
+
+                    <div class="rounded-xl bg-[#F8FBFA] border border-[#E9F0ED] p-4 flex items-start justify-between gap-3">
+                      <div>
+                        <p class="text-[11px] font-semibold text-[#7A8E8A] tabular-nums">04</p>
+                        <p class="text-sm font-semibold text-[#102A26] mt-1">Upload Additional Documentation</p>
+                        <p class="text-xs text-[#687C78] mt-1">Upload outstanding documentation</p>
+                      </div>
+                      <span class="text-[10px] font-semibold tracking-[0.06em] uppercase text-[#7A8E8A]">ACCOUNT</span>
+                    </div>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </div>
+
+          ${renderPortalFooter()}
+        </main>
+      `;
+    }
+
+    // Screen C: Course Registration Landing ("Course registration.png")
+    function renderRegistrationLanding() {
+      return `
+        ${renderTopBar()}
+        <main class="flex-1 bg-[#F6F9F8] flex flex-col">
+          <div class="max-w-[1140px] w-full mx-auto px-4 sm:px-8 pt-8 space-y-6">
+            <div>
+              <p class="text-[11px] font-semibold tracking-[0.08em] uppercase text-[#0A5C48]">ACADEMICS / SPRING 2027</p>
+              <h1 class="text-3xl sm:text-[38px] font-bold tracking-[-0.02em] text-[#102A26] mt-1.5 leading-tight">
+                Make room for what’s next.
+              </h1>
+              <p class="text-sm sm:text-base text-[#526662] mt-1.5">
+                Plan your semester or go straight to course registration.
+              </p>
+            </div>
+
+            ${renderRegistrationBanner('November 20 – December 11')}
+
+            <!-- Two Side-by-Side Action Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <!-- Card 01 / EXPLORE (Light Card) -->
+              <section class="bg-white border border-[#E2ECE8] rounded-2xl p-6 sm:p-7 flex flex-col justify-between min-h-[225px] shadow-[0_1px_2px_rgba(16,42,38,0.03)]">
+                <div>
+                  <p class="text-[11px] font-semibold tracking-[0.07em] uppercase text-[#0A5C48]">01 / EXPLORE</p>
+                  <h2 class="text-2xl font-bold text-[#102A26] mt-2">Build your course plan</h2>
+                  <p class="text-sm text-[#526662] mt-2 leading-relaxed">
+                    Explore available courses, check requirements, and map out a schedule that works for you.
+                  </p>
+                </div>
+                <div class="pt-6">
+                  <button
+                    type="button"
+                    onclick="handlePlanCoursesClick()"
+                    class="text-sm font-semibold text-[#0A5C48] underline underline-offset-4 hover:text-[#064E3B] cursor-pointer"
+                  >
+                    Plan courses
+                  </button>
+                </div>
+              </section>
+
+              <!-- Card 02 / ENROLL (Dark Forest Card) -->
+              <section class="bg-[#0B2421] border border-[#0B2421] rounded-2xl p-6 sm:p-7 text-white flex flex-col justify-between min-h-[225px] shadow-[0_4px_14px_rgba(11,36,33,0.12)]">
+                <div>
+                  <p class="text-[11px] font-semibold tracking-[0.07em] uppercase text-[#66B9A2]">02 / ENROLL</p>
+                  <h2 class="text-2xl font-bold text-white mt-2">Ready to register?</h2>
+                  <p class="text-sm text-[#C4D6D1] mt-2 leading-relaxed">
+                    Find your classes, choose available sections, and submit your registration for Spring 2027.
+                  </p>
+                </div>
+                <div class="pt-6">
+                  <button
+                    type="button"
+                    onclick="switchView('registration-workspace')"
+                    class="text-sm font-semibold text-white underline underline-offset-4 hover:text-[#9CE0CC] cursor-pointer"
+                  >
+                    Register for courses
+                  </button>
+                </div>
+              </section>
+            </div>
+
+            <!-- Bottom Info Card -->
+            <section class="bg-white border border-[#E2ECE8] rounded-2xl p-5 sm:p-6 shadow-[0_1px_2px_rgba(16,42,38,0.03)]">
+              <h2 class="text-sm font-bold text-[#102A26]">Before you begin</h2>
+              <p class="text-xs sm:text-sm text-[#687C78] mt-1">
+                Review your degree requirements and resolve any registration holds before enrolling.
+              </p>
+            </section>
+          </div>
+
+          ${renderPortalFooter()}
+        </main>
+      `;
+    }
+
+    // Weekly Schedule Grid ("Your schedule", TIME 9:00 to 4:00, MON-FRI)
+    function renderWeeklyScheduleGrid() {
+      const days = ['MON', 'TUE', 'WED', 'THU', 'FRI'];
+      const hours = [
+        { hour: 9, label: '9:00' },
+        { hour: 10, label: '10:00' },
+        { hour: 11, label: '11:00' },
+        { hour: 12, label: '12:00' },
+        { hour: 13, label: '1:00' },
+        { hour: 14, label: '2:00' },
+        { hour: 15, label: '3:00' },
+        { hour: 16, label: '4:00' }
+      ];
+
+      // Active courses in workspace (either selected/checked or imported in "Your courses")
+      const activeCourseIds = Object.keys(state.yourCourses);
+
+      // Collect schedule blocks for active non-full courses
+      const blocks = [];
+      activeCourseIds.forEach(courseId => {
+        const course = getCourseById(courseId);
+        if (!course || course.isFull) return;
+        course.scheduleBlocks.forEach(blk => {
+          blocks.push({
+            ...blk,
+            courseId: course.id,
+            code: course.code
+          });
+        });
+      });
+
+      const totalHours = hours.length;
+      const rowHeightPx = 54;
+
+      return `
+        <div class="bg-white border border-[#E2ECE8] rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,42,38,0.03)] flex flex-col">
+          <h2 class="text-base font-bold text-[#102A26]">Your schedule</h2>
+
+          <div class="mt-3 rounded-xl bg-[#F4F8F7] border border-[#E8EFECE] px-3.5 py-2.5">
+            <p class="text-xs font-bold text-[#102A26]">Spring 2027 · Weekly preview</p>
+            <p class="text-[11px] text-[#687C78] mt-0.5">Full courses join the waitlist and do not reserve a time slot.</p>
+          </div>
+
+          <div class="mt-4 overflow-x-auto">
+            <div class="min-w-[440px]">
+              <!-- Day Headers -->
+              <div class="grid grid-cols-[44px_repeat(5,1fr)] gap-1.5 mb-2 text-center">
+                <div class="text-[10px] font-semibold tracking-[0.05em] uppercase text-[#7A8E8A] flex items-end justify-start pb-0.5">
+                  TIME
+                </div>
+                ${days.map(d => `
+                  <div class="text-[10px] font-semibold tracking-[0.06em] uppercase text-[#526662] py-1">
+                    ${d}
+                  </div>
+                `).join('')}
+              </div>
+
+              <!-- Time Slots + Overlay Blocks -->
+              <div class="relative grid grid-cols-[44px_repeat(5,1fr)] gap-1.5" style="height: ${totalHours * rowHeightPx}px;">
+                <!-- Time Axis Labels -->
+                <div class="flex flex-col justify-between pr-1">
+                  ${hours.map(h => `
+                    <div class="text-[11px] text-[#7A8E8A] tabular-nums leading-none -mt-1">
+                      ${h.label}
+                    </div>
+                  `).join('')}
+                </div>
+
+                <!-- 5 Day Columns -->
+                ${days.map(day => {
+                  const dayBlocks = blocks.filter(b => b.day === day);
+                  return `
+                    <div class="relative rounded-lg bg-[#F7FAF9] border border-[#EDF3F0] h-full overflow-hidden">
+                      ${hours.map((_, idx) => `
+                        <div
+                          class="w-full border-b border-dashed border-[#E6EEEC]"
+                          style="height: ${rowHeightPx}px; ${idx === hours.length - 1 ? 'border-bottom: none;' : ''}"
+                        ></div>
+                      `).join('')}
+
+                      ${dayBlocks.map(blk => {
+                        const topPx = (blk.startHour - 9) * rowHeightPx;
+                        const heightPx = Math.max(26, blk.durationHours * rowHeightPx - 2);
+                        const isAmber = blk.variant === 'amber';
+                        const cardClasses = isAmber
+                          ? 'bg-[#FDF3E2] border-[#F4DCAA] text-[#8E5312]'
+                          : 'bg-[#E5F2EC] border-[#C5E2D6] text-[#0A5C48]';
+
+                        return `
+                          <div
+                            style="top: ${topPx}px; height: ${heightPx}px;"
+                            class="absolute inset-x-1 rounded-md border px-1.5 py-1 flex flex-col justify-center leading-tight ${cardClasses}"
+                          >
+                            <span class="text-[10px] font-bold truncate">${blk.code}</span>
+                            <span class="text-[9px] opacity-90 tabular-nums truncate">${blk.labelTime}</span>
+                          </div>
+                        `;
+                      }).join('')}
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          </div>
+
+          <p class="text-[11px] text-[#7A8E8A] mt-4">
+            Select courses, then save to confirm your changes.
+          </p>
+        </div>
+      `;
+    }
+
+    // Screen D: Register for Courses Workspace ("Empty schedule.png" & "Imported plan.png")
+    function renderRegistrationWorkspace() {
+      const q = state.searchQuery.trim().toLowerCase();
+      const filteredCatalog = CATALOG_COURSES.filter(course => {
+        const matchesGroup = state.showAllCourses ? true : course.group === 'first';
+        if (!q) return matchesGroup;
+        return (
+          course.code.toLowerCase().includes(q) ||
+          course.title.toLowerCase().includes(q) ||
+          course.location.toLowerCase().includes(q) ||
+          course.scheduleText.toLowerCase().includes(q)
+        );
+      });
+
+      const yourCourseIds = Object.keys(state.yourCourses);
+
+      return `
+        ${renderTopBar()}
+        <main class="flex-1 bg-[#F6F9F8] flex flex-col pb-24">
+          <div class="max-w-[1280px] w-full mx-auto px-4 sm:px-8 pt-7 space-y-5">
+            <!-- Page Title & Student Tag -->
+            <div class="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2">
+              <div>
+                <p class="text-[11px] font-semibold tracking-[0.08em] uppercase text-[#0A5C48]">ACADEMICS / SPRING 2027</p>
+                <h1 class="text-2xl sm:text-[32px] font-bold tracking-[-0.02em] text-[#102A26] mt-1">
+                  Register for courses
+                </h1>
+                <p class="text-sm text-[#526662] mt-0.5">
+                  Explore courses and review your weekly schedule before enrolling.
+                </p>
+              </div>
+              <p class="text-xs text-[#687C78] tabular-nums">Jordan Lee · ID 00218476</p>
+            </div>
+
+            <!-- Search Input + Import Course Plan Action Card -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+              <div class="lg:col-span-8 bg-white border border-[#E2ECE8] rounded-2xl px-4 py-3 flex flex-col justify-center shadow-[0_1px_2px_rgba(16,42,38,0.03)]">
+                <label for="course-search-input" class="text-[10px] font-semibold tracking-[0.06em] uppercase text-[#687C78]">
+                  SEARCH COURSES
+                </label>
+                <input
+                  id="course-search-input"
+                  type="text"
+                  value="${state.searchQuery.replace(/"/g, '&quot;')}"
+                  oninput="handleSearchChange(this.value)"
+                  placeholder="Search by course title, code, or subject"
+                  class="mt-1 w-full bg-transparent text-sm text-[#102A26] placeholder-[#96A8A4] focus:outline-none"
+                />
+              </div>
+
+              <div class="lg:col-span-4">
+                ${!state.planImported ? `
+                  <button
+                    type="button"
+                    onclick="handleImportCoursePlan()"
+                    class="w-full h-full rounded-2xl bg-[#0A5C48] hover:bg-[#064E3B] text-white px-5 py-3.5 text-left transition shadow-[0_2px_6px_rgba(10,92,72,0.18)] cursor-pointer flex flex-col justify-center"
+                  >
+                    <span class="text-sm font-semibold block">Import course plan</span>
+                    <span class="text-xs text-[#CBE6DC] mt-0.5 block tabular-nums">Saved Spring 2027 plan · 3 courses · 9 credits</span>
+                  </button>
+                ` : `
+                  <div class="w-full h-full rounded-2xl bg-[#E6F3EE] border border-[#C6E3D8] px-5 py-3.5 text-left flex flex-col justify-center">
+                    <span class="text-sm font-bold text-[#0A5C48] block">Spring 2027 plan imported</span>
+                    <span class="text-xs text-[#2B6656] mt-0.5 block tabular-nums">Saved Spring 2027 plan · 3 courses · 9 credits</span>
+                  </div>
+                `}
+              </div>
+            </div>
+
+            <!-- 3-Column Workspace: Available courses | Your schedule | Your courses -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+              <!-- Left Column: Available courses (4 cols) -->
+              <section class="lg:col-span-4 bg-white border border-[#E2ECE8] rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,42,38,0.03)]">
+                <div class="flex items-baseline justify-between">
+                  <h2 class="text-base font-bold text-[#102A26]">Available courses</h2>
+                  <span class="text-xs text-[#7A8E8A] tabular-nums">6 courses</span>
+                </div>
+                <p class="text-xs text-[#7A8E8A] mt-0.5 mb-4">3 credits each · Spring 2027</p>
+
+                <div class="space-y-3">
+                  ${filteredCatalog.length === 0 ? `
+                    <div class="rounded-xl bg-[#F7FAF9] border border-[#E6EFEC] p-4 text-center">
+                      <p class="text-xs font-medium text-[#526662]">No matching courses found.</p>
+                      <button
+                        type="button"
+                        onclick="handleSearchChange('')"
+                        class="mt-2 text-xs font-semibold text-[#0A5C48] underline cursor-pointer"
+                      >
+                        Clear search
+                      </button>
+                    </div>
+                  ` : filteredCatalog.map(course => {
+                    const entry = state.yourCourses[course.id];
+                    const isChecked = Boolean(entry && entry.checked);
+                    const seatBannerClass = course.isFull
+                      ? 'bg-[#FDF3E2] text-[#9A5B13]'
+                      : 'bg-[#E6F3EE] text-[#0A5C48]';
+                    const codeColorClass = course.isFull ? 'text-[#9A5B13]' : 'text-[#0A5C48]';
+
+                    return `
+                      <div class="rounded-xl border ${isChecked ? 'border-[#A7D3C3] bg-[#F9FCFB]' : 'border-[#E6EFEC] bg-[#FAFDFC]'} p-4 transition">
+                        <div class="flex items-start justify-between gap-2">
+                          <label class="flex items-center gap-2.5 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              class="nf-checkbox"
+                              ${isChecked ? 'checked' : ''}
+                              onchange="toggleCourseSelection('${course.id}')"
+                            />
+                            <span class="text-sm font-bold ${codeColorClass} tabular-nums">${course.code}</span>
+                          </label>
+                          <span class="text-xs text-[#7A8E8A] tabular-nums">${course.credits} credits</span>
+                        </div>
+
+                        <p class="text-sm font-bold text-[#102A26] mt-1.5 pl-7">${course.title}</p>
+                        <p class="text-xs text-[#526662] mt-1 pl-7">${course.scheduleText}</p>
+                        <p class="text-[11px] text-[#7A8E8A] mt-0.5 pl-7">${course.location}</p>
+
+                        <div class="mt-3 pl-7">
+                          <div class="rounded-lg px-3 py-2 text-xs leading-snug ${seatBannerClass}">
+                            <p class="font-semibold tabular-nums">${course.seatsAvailable} seats available</p>
+                            <p class="opacity-90 tabular-nums mt-0.5">${course.waitlistSeats} waitlist seats available</p>
+                          </div>
+                        </div>
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+
+                <!-- Pagination Links: First courses | More courses -->
+                <div class="mt-4 pt-2 flex items-center justify-between text-xs font-semibold">
+                  <button
+                    type="button"
+                    onclick="toggleShowAllCourses(false)"
+                    class="${!state.showAllCourses ? 'text-[#0A5C48] underline underline-offset-4' : 'text-[#526662] hover:text-[#0A5C48]'} cursor-pointer"
+                  >
+                    First courses
+                  </button>
+                  <button
+                    type="button"
+                    onclick="toggleShowAllCourses(true)"
+                    class="${state.showAllCourses ? 'text-[#0A5C48] underline underline-offset-4' : 'text-[#0A5C48] underline underline-offset-4 hover:text-[#064E3B]'} cursor-pointer"
+                  >
+                    More courses
+                  </button>
+                </div>
+              </section>
+
+              <!-- Center Column: Your schedule (5 cols) -->
+              <div class="lg:col-span-5">
+                ${renderWeeklyScheduleGrid()}
+              </div>
+
+              <!-- Right Column: Your courses (3 cols) -->
+              <section class="lg:col-span-3 bg-white border border-[#E2ECE8] rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,42,38,0.03)]">
+                <h2 class="text-base font-bold text-[#102A26]">Your courses</h2>
+                <p class="text-xs text-[#7A8E8A] mt-1 leading-relaxed">
+                  Check courses to add or remove, then use the buttons below.
+                </p>
+
+                ${yourCourseIds.length === 0 ? `
+                  <div class="mt-4 rounded-xl bg-[#F7FAF9] border border-[#ECF2EF] p-4">
+                    <p class="text-xs font-bold text-[#102A26]">Your course list is empty</p>
+                    <p class="text-[11px] text-[#7A8E8A] mt-1 leading-relaxed">
+                      Select courses in the catalog or import your saved course plan.
+                    </p>
+                  </div>
+                ` : `
+                  <div class="mt-4 space-y-2.5">
+                    ${yourCourseIds.map(courseId => {
+                      const course = getCourseById(courseId);
+                      const entry = state.yourCourses[courseId];
+                      if (!course || !entry) return '';
+
+                      const isWaitlist = course.isFull;
+                      const cardStyle = isWaitlist
+                        ? 'bg-[#FDF3E2] border-[#F4DCAA]'
+                        : 'bg-[#F8FBFA] border-[#E5EFEA]';
+
+                      let statusBadgeHtml = '';
+                      if (isWaitlist) {
+                        statusBadgeHtml = `<span class="text-[11px] font-semibold text-[#9A5B13] block mt-1.5">Full · waitlist on save</span>`;
+                      } else if (entry.statusTag === 'saved') {
+                        statusBadgeHtml = `<span class="text-[11px] font-semibold text-[#0A5C48] block mt-1.5">Saved in schedule</span>`;
+                      } else if (entry.statusTag === 'imported') {
+                        statusBadgeHtml = `<span class="text-[11px] font-semibold text-[#0A5C48] block mt-1.5">Imported · not saved</span>`;
+                      } else {
+                        statusBadgeHtml = `<span class="text-[11px] font-semibold text-[#0A5C48] block mt-1.5">Selected · not saved</span>`;
+                      }
+
+                      return `
+                        <div class="rounded-xl border p-3 ${cardStyle}">
+                          <div class="flex items-start gap-2">
+                            <input
+                              type="checkbox"
+                              class="nf-checkbox mt-0.5"
+                              ${entry.checked ? 'checked' : ''}
+                              onchange="toggleCourseSelection('${course.id}')"
+                            />
+                            <div class="min-w-0 flex-1">
+                              <p class="text-xs font-bold text-[#102A26] truncate">${course.code}</p>
+                              <p class="text-xs font-semibold text-[#102A26] leading-snug mt-0.5">${course.title}</p>
+                              <p class="text-[11px] text-[#687C78] mt-1">${course.scheduleText}</p>
+                              ${statusBadgeHtml}
+                            </div>
+                          </div>
+                        </div>
+                      `;
+                    }).join('')}
+                  </div>
+                `}
+              </section>
+            </div>
+          </div>
+
+          ${renderPortalFooter()}
+        </main>
+
+        <!-- Bottom Sticky Action Bar -->
+        <div class="fixed bottom-0 inset-x-0 z-30 bg-white border-t border-[#E2ECE8] shadow-[0_-2px_10px_rgba(16,42,38,0.04)]">
+          <div class="max-w-[1280px] mx-auto px-4 sm:px-8 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pr-24 sm:pr-8">
+            <div>
+              <p class="text-xs font-bold text-[#102A26]">Selections are not saved automatically.</p>
+              <p class="text-[11px] text-[#7A8E8A]">
+                Use Add courses to schedule to save. Remove also leaves a course waitlist.
+              </p>
+            </div>
+            <div class="flex items-center gap-2.5 self-end sm:self-auto">
+              <button
+                type="button"
+                onclick="handleRemoveCheckedCourses()"
+                class="px-4 py-2 rounded-lg border border-[#DCE6E2] bg-white hover:bg-[#F5F8F7] text-xs font-semibold text-[#102A26] transition cursor-pointer"
+              >
+                Remove
+              </button>
+              <button
+                type="button"
+                onclick="handleAddCoursesToSchedule()"
+                class="px-4 py-2 rounded-lg bg-[#0A5C48] hover:bg-[#064E3B] text-xs font-semibold text-white transition shadow-xs cursor-pointer"
+              >
+                Add courses to schedule
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Active Pop-up Modals
+    function renderActiveModal() {
+      if (!state.activeModal) return '';
+
+      // 1. "Existing Spring plan · Pop-up.png"
+      if (state.activeModal === 'existing-plan') {
+        return `
+          <div class="fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4" role="dialog" aria-modal="true">
+            <div class="modal-card w-full max-w-[440px] bg-white rounded-2xl p-6 sm:p-7 shadow-xl border border-[#E2ECE8]">
+              <p class="text-[11px] font-semibold tracking-[0.07em] uppercase text-[#0A5C48]">SPRING 2027 / COURSE PLAN</p>
+              <h2 class="text-xl sm:text-2xl font-bold text-[#102A26] mt-1.5">You’ve already created a plan</h2>
+              <p class="text-sm text-[#526662] mt-2 leading-relaxed">
+                You’ve already created a plan for Spring 2027. Would you like to create a new plan?
+              </p>
+
+              <div class="mt-6 space-y-2.5">
+                <button
+                  type="button"
+                  onclick="handleExistingPlanContinue()"
+                  class="w-full py-2.5 px-4 rounded-xl bg-[#0A5C48] hover:bg-[#064E3B] text-white text-sm font-semibold transition cursor-pointer"
+                >
+                  continue to registration
+                </button>
+                <button
+                  type="button"
+                  onclick="handleCreateNewPlan()"
+                  class="w-full py-2.5 px-4 rounded-xl bg-[#F3F7F6] hover:bg-[#E7EFECE] text-[#526662] text-sm font-medium transition cursor-pointer"
+                >
+                  create a new plan
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      // 2. "Course selection required.png"
+      if (state.activeModal === 'selection-required') {
+        return `
+          <div class="fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4" role="dialog" aria-modal="true">
+            <div class="modal-card w-full max-w-[400px] bg-white rounded-2xl p-6 sm:p-7 shadow-xl border border-[#E2ECE8]">
+              <h2 class="text-xl font-bold text-[#102A26]">Select a course first</h2>
+              <p class="text-sm text-[#526662] mt-1.5">Select at least one course, then try again.</p>
+
+              <div class="mt-6">
+                <button
+                  type="button"
+                  onclick="closeModal()"
+                  class="w-full py-2.5 px-4 rounded-xl bg-[#0A5C48] hover:bg-[#064E3B] text-white text-sm font-semibold transition cursor-pointer"
+                >
+                  Back to courses
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      // 3. "Courses saved · Confirmation.png"
+      if (state.activeModal === 'courses-saved') {
+        return `
+          <div class="fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4" role="dialog" aria-modal="true">
+            <div class="modal-card w-full max-w-[420px] bg-white rounded-2xl p-6 sm:p-7 shadow-xl border border-[#E2ECE8]">
+              <p class="text-[11px] font-semibold tracking-[0.07em] uppercase text-[#0A5C48]">SPRING 2027 / SAVED</p>
+              <h2 class="text-xl sm:text-2xl font-bold text-[#102A26] mt-1.5">Courses added to your schedule</h2>
+              <p class="text-sm text-[#526662] mt-2">
+                You’ve successfully added your selected courses to your schedule.
+              </p>
+
+              <div class="mt-6">
+                <button
+                  type="button"
+                  onclick="closeModal()"
+                  class="w-full py-2.5 px-4 rounded-xl bg-[#0A5C48] hover:bg-[#064E3B] text-white text-sm font-semibold transition cursor-pointer"
+                >
+                  Continue
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      // 4. "Alternatives · Choose courses.png"
+      if (state.activeModal === 'alternatives') {
+        return `
+          <div class="fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4 overflow-y-auto" role="dialog" aria-modal="true">
+            <div class="modal-card w-full max-w-[540px] bg-white rounded-2xl p-6 sm:p-7 shadow-xl border border-[#E2ECE8] my-auto">
+              <p class="text-[11px] font-semibold tracking-[0.07em] uppercase text-[#0A5C48]">SPRING 2027 / NO TIME CONFLICTS</p>
+              <h2 class="text-2xl font-bold text-[#102A26] mt-1">Explore courses that fit</h2>
+              <p class="text-xs sm:text-sm text-[#526662] mt-1.5">
+                These courses fit around CS 220 and HIST 110. Select any alternatives to add them to Your courses.
+              </p>
+
+              <div class="mt-4 space-y-2.5">
+                ${ALTERNATIVE_COURSES.map(alt => {
+                  const checked = state.selectedAlternativeIds.includes(alt.id);
+                  return `
+                    <label class="flex items-start gap-3 rounded-xl bg-[#F6F9F8] hover:bg-[#EFF5F2] border border-[#E3ECE8] p-3.5 cursor-pointer transition">
+                      <input
+                        type="checkbox"
+                        class="nf-checkbox mt-0.5"
+                        ${checked ? 'checked' : ''}
+                        onchange="toggleAlternativeCheckbox('${alt.id}')"
+                      />
+                      <div>
+                        <p class="text-xs sm:text-sm font-bold text-[#102A26]">${alt.code} · ${alt.title}</p>
+                        <p class="text-xs text-[#687C78] mt-0.5">${alt.scheduleCredits}</p>
+                        <p class="text-xs font-medium text-[#0A5C48] mt-0.5 tabular-nums">${alt.seatsText}</p>
+                      </div>
+                    </label>
+                  `;
+                }).join('')}
+              </div>
+
+              <div class="mt-4 rounded-xl bg-[#E6F3EE] border border-[#C8E4DA] px-4 py-3">
+                <p class="text-xs font-bold text-[#0A5C48]">Adding to your list does not save the course.</p>
+                <p class="text-[11px] text-[#286151] mt-0.5 leading-relaxed">
+                  Back on registration, tick the course in Your courses and click Add courses to schedule to save it.
+                </p>
+              </div>
+
+              <p class="text-[11px] text-[#7A8E8A] mt-3">
+                You remain on the MATH 230 waitlist unless you remove that course.
+              </p>
+
+              <div class="mt-5 space-y-2">
+                <button
+                  type="button"
+                  onclick="handleAddAlternativesToList()"
+                  class="w-full py-2.5 px-4 rounded-xl bg-[#0A5C48] hover:bg-[#064E3B] text-white text-sm font-semibold transition cursor-pointer"
+                >
+                  Add to your course list
+                </button>
+                <button
+                  type="button"
+                  onclick="closeModal()"
+                  class="w-full py-2.5 px-4 rounded-xl bg-[#F3F7F6] hover:bg-[#E7EFECE] text-[#102A26] text-sm font-semibold transition cursor-pointer"
+                >
+                  Back to registration
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      return '';
+    }
+
+    // Master Render Function
+    function render() {
+      const appEl = document.getElementById('app');
+      if (!appEl) return;
+
+      let screenHtml = '';
+      switch (state.currentView) {
+        case 'sidebar-dashboard':
+          screenHtml = renderSidebarDashboard();
+          break;
+        case 'course-dashboard':
+          screenHtml = renderCourseFirstDashboard();
+          break;
+        case 'registration-landing':
+          screenHtml = renderRegistrationLanding();
+          break;
+        case 'registration-workspace':
+          screenHtml = renderRegistrationWorkspace();
+          break;
+        default:
+          screenHtml = renderSidebarDashboard();
+      }
+
+      appEl.innerHTML = screenHtml + renderActiveModal();
+    }
+
+    // Initialize prototype on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      render();
+    });
+  </script>
+</body>
+</html>
